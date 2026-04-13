@@ -25,9 +25,6 @@ const CONFIG = {
   REGEX_URL: /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+|@\w{5,})/gi
 };
 
-const ALLOWED_TELEGRAM_KEYWORDS = ['paperworkbybryan'];
-const ALLOWED_DOMAINS = ['youtube.com', 'github.com', 'clawhub.ai', 'platform.minimaxi.com', 'web3.okx.com', 'cryptofuture2026-neural-ledger.pages.dev', 'x.com'];
-
 // Telegram 系統帳號 / 匿名管理員 ID，一律視為管理員
 const SYSTEM_BOT_IDS = new Set([777000, 1087968824, 136817688]);
 
@@ -440,7 +437,7 @@ function analyzeMessage(message, dynamicWhitelist) {
   const urls = extractUrls(message);
   let hasTelegram = false;
   let hasSuspicious = false;
-  const fullWhitelist = [...ALLOWED_DOMAINS, ...dynamicWhitelist];
+  const fullWhitelist = [...dynamicWhitelist];
 
   for (const url of urls) {
     try {
@@ -461,11 +458,8 @@ function analyzeMessage(message, dynamicWhitelist) {
         }
 
         // ── 3. 通用邀請連結檢查 (spam 防禦) ──
-        const isInvite = fullPath.startsWith('/+') || fullPath.includes('/joinchat/');
         if (isInvite) {
-          // 排除白名單關鍵字
-          const isKeywordAllowed = ALLOWED_TELEGRAM_KEYWORDS.some(k => fullPath.includes(k.toLowerCase()));
-          if (!isKeywordAllowed) { hasTelegram = true; break; }
+          hasTelegram = true; break; 
         }
         // 准許普通 @username 或頻道連結
       } else if (domain !== 'telegram.org') {
@@ -660,10 +654,6 @@ async function handleAdminCommands(botToken, env, ctx, message, status) {
     const dyn = await getDynamicWhitelist(env, chatId);
     const dynUsers = await getDynamicUserWhitelist(env, chatId);
     let out = t('list_header');
-    if (ALLOWED_DOMAINS.length || ALLOWED_TELEGRAM_KEYWORDS.length) {
-      const hard = [...ALLOWED_DOMAINS, ...ALLOWED_TELEGRAM_KEYWORDS.map(k => `t.me/${k}`)];
-      out += t('list_hard') + hard.map(d => `• ${d}`).join('\n') + '\n';
-    }
     out += t('list_dyn') + (dyn.length > 0 ? dyn.map(d => `• ${d}`).join('\n') : '(Empty)') + '\n';
     
     // 列表化特許用戶
