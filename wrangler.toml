@@ -1,0 +1,13 @@
+# wrangler.toml — Cloudflare Workers 設定檔
+# 文件：https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "tg-guard-bot-v2"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "TG_GUARD_KV"
+id = "98c5eb64472944618ccd2eada8b9947c"
+
+[triggers]
+crons = ["0 0 * * *"]
