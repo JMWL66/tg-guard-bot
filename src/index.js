@@ -40,7 +40,8 @@ const BLACKLISTED_INVITE_LINKS = new Set([
   'https://t.me/+Ge5lo8V8uDo4ODdl',
   'https://t.me/+DydE0_0pr1c4NjY1',
   'https://t.me/+_20NHyKkibczZTU5',
-  'https://t.me/+BCKNBdfXxAViM2Fh'
+  'https://t.me/+BCKNBdfXxAViM2Fh',
+  'https://t.me/+TUypbviU3i05ZTkx'
 ]);
 
 // 關鍵詞組合黑名單：組內所有詞同時出現 → 刪除封禁
@@ -60,6 +61,12 @@ const KEYWORD_SETS = [
   ['8年合约', '社区'],
   ['高勝率', '返佣'],
   ['社區免費', '直播間'],
+  // 新增圖中誘導廣告關鍵詞
+  ['币圈合约交流群社区'],
+  ['币圈交流大队'],
+  ['币圈', '合约', '交流群'],
+  ['币圈', '交流', '大队'],
+  ['币圈', '交流', '集合啦'],
   // ── 通用及組合關鍵詞 ──
   ['內部群', '免費'],
   ['内部群', '免费'],
