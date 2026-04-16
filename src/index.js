@@ -44,6 +44,12 @@ const BLACKLISTED_INVITE_LINKS = new Set([
   'https://t.me/+TUypbviU3i05ZTkx'
 ]);
 
+// 轉發來源黑名單：來自這些群組的轉發將直接永久封禁
+const BLACKLISTED_FORWARD_SOURCES = new Set([
+  '比特币btc合约免费跟单',
+  '币圈交流大队'
+]);
+
 // 關鍵詞組合黑名單：組內所有詞同時出現 → 刪除封禁
 // 每個子陣列是一組「AND 條件」，任一組命中即觸發
 const KEYWORD_SETS = [
@@ -118,6 +124,12 @@ const KEYWORD_SETS = [
   ['免費', '跟車'],
   ['免费', '带单'],
   ['免費', '帶單'],
+  // ── 來自垃圾廣告圖片的關鍵詞 ──
+  ['比特币', '跟单'],
+  ['比特币', 'BTC', '合约'],
+  ['朱桑', '内部群'],
+  ['收获', '五连胜'],
+  ['欢迎', '进群', '质检'],
 ];
 
 // ─── 語言檔 ────────────────────────────────────────────────────
@@ -465,6 +477,7 @@ function analyzeMessage(message, dynamicWhitelist) {
         }
 
         // ── 3. 通用邀請連結檢查 (spam 防禦) ──
+        const isInvite = fullPath.startsWith('/joinchat/') || fullPath.startsWith('/+');
         if (isInvite) {
           hasTelegram = true; break; 
         }
@@ -804,19 +817,25 @@ async function handleMessage(botToken, env, ctx, message) {
       || message.forward_from_chat?.title || message.forward_from?.first_name
       || replyOrigin.chat?.title || replyOrigin.sender_user?.first_name
       || replySenderChat?.title || replyForwardChat?.title || 'unknown';
-    log('info', 'Forward 違規', { chatId, userId, forwardSrc });
-    await deleteMessage(botToken, chatId, message.message_id);
-    if (userId) {
-      const count = await incrementViolations(env, chatId, userId);
-      const actionType = await punishUser(botToken, env, chatId, message.from, 'forward', count);
-      const warnKey = actionType === 'mute_24h' ? 'warn_mute_24h' : actionType === 'mute_7d' ? 'warn_mute_7d' : 'kick_final';
+    const isMaliciousSource = BLACKLISTED_FORWARD_SOURCES.has(forwardSrc);
+
+    if (isMaliciousSource && userId) {
+      log('info', 'Forward 黑名單來源攔截', { chatId, userId, forwardSrc });
+      await deleteMessage(botToken, chatId, message.message_id);
+      
+      const count = 3;
+      const reason = 'banned_source';
+      const actionType = await punishUser(botToken, env, chatId, message.from, reason, count);
       
       ctx.waitUntil(Promise.all([
-        notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls: [`[forwarded from: ${forwardSrc}]`], reason: 'forward', originalText, count })
+        notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls: [`[forwardSrc: ${forwardSrc}]`], reason, originalText, count })
       ]));
-      sendTemporaryMessage(botToken, chatId, t(warnKey), ctx);
+      sendTemporaryMessage(botToken, chatId, t('kick_final'), ctx);
+      return;
     }
-    return;
+
+    // 普通轉發放行，交由 Rule 2/3 進行關鍵詞與連結檢查
+    log('info', 'Forward allowed (passing to content scanning)', { chatId, userId, forwardSrc });
   }
 
   // ── 規則 2：關鍵詞組合偵測 / 多✅emoji → 立即封禁 ──────────

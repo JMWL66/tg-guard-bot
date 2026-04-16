@@ -205,6 +205,17 @@ npx wrangler secret put EXPORT_SECRET
 npx wrangler deploy
 ```
 
+### 12. 轉發規則放寬與精準黑名單 (Forward Relaxation & Malicious Source Blacklist)
+
+針對平衡「社群互動」與「廣告防護」，我們對轉發規則進行了重大重構：
+
+*   **轉發全面放寬**：現在普通成員可以**正常轉發**任何訊息。機器人不再「無差別」攔截轉發，而是將轉發內容交由後續的關鍵詞與連結檢查，實現更人性化的管理。
+*   **來源黑名單與加重處罰**：
+    *   **精準打擊**：新增 **`BLACKLISTED_FORWARD_SOURCES`** 名單，專門針對已知的廣告大本營（如「`比特币btc合约免费跟单`」等群組）。
+    *   **直接封禁**：如果訊息是從這些黑名單群組轉發而來，機器人會判定為惡意源碼，**跳過所有警告，直接執行永久封鎖**。
+*   **廣告語料庫持續更新**：新增針對近期圖片廣告中的「駐群老師」、「五連勝」、「進群質檢」、「朱桑」等誘騙詞彙的過濾組合。
+*   **關鍵 Bug 修復**：修正了 `analyzeMessage` 函數中 `isInvite` 變數未定義導致的 ReferenceError，確保邀請連結攔截功能穩健運行。
+
 ---
 
 *Powered by Cloudflare Workers & Antigravity AI*

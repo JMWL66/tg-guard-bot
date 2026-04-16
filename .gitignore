@@ -1,0 +1,15 @@
+# Node.js
+node_modules/
+dist/
+build/
+
+# Wrangler/Cloudflare
+.wrangler/
+.dev.vars
+
+# OS
+.DS_Store
+
+# Misc
+*.log
+.env
