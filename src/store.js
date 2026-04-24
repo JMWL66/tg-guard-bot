@@ -84,3 +84,21 @@ export async function checkShortMessageSpam(env, chatId, userId, text) {
   await env.TG_GUARD_KV.put(key, count.toString(), { expirationTtl: CONFIG.SHORT_MSG_WINDOW });
   return count >= CONFIG.SHORT_MSG_MAX;
 }
+
+export async function recordUserJoinTime(env, chatId, userId) {
+  const key = `join:${chatId}:${userId}`;
+  const now = Math.floor(Date.now() / 1000);
+  // 保留入群時間 24 小時（足夠覆蓋 5 分鐘的檢查，也可供後續扩展使用）
+  await env.TG_GUARD_KV.put(key, now.toString(), { expirationTtl: 24 * 3600 });
+}
+
+export async function isUserInCooldown(env, chatId, userId) {
+  const key = `join:${chatId}:${userId}`;
+  const joinTimeStr = await env.TG_GUARD_KV.get(key);
+  if (!joinTimeStr) return false; // 没有記錄，視為老用戶（安全回退）
+  
+  const joinTime = parseInt(joinTimeStr);
+  const now = Math.floor(Date.now() / 1000);
+  // 5 分鐘 = 300 秒
+  return (now - joinTime) <= 300;
+}

@@ -6,9 +6,9 @@ export function matchesKeywordSet(text) {
   if (!text) return false;
   const normalized = normalizeText(text);
 
-  // 特殊規則：含有 2 個或以上 ✅ (常見於垃圾信息)
+  // 特殊規則：含有 4 個或以上 ✅ (常見於垃圾信息)
   const checkCount = (text.match(/✅/g) || []).length;
-  if (checkCount >= 2) return true;
+  if (checkCount >= 4) return true;
 
   return KEYWORD_SETS.some(set => {
     // 將關鍵詞也正規化後進行比對，以應對空格/符號規避

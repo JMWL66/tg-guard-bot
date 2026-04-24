@@ -8,7 +8,8 @@ import {
   getDynamicWhitelist, 
   checkRateLimit, 
   checkDuplicate, 
-  checkShortMessageSpam 
+  checkShortMessageSpam,
+  isUserInCooldown
 } from './store.js';
 import { matchesKeywordSet, hasMultiCheckmark, analyzeMessage } from './detector.js';
 import { punishUser, notifyAdminLog } from './moderation.js';
@@ -62,7 +63,7 @@ export async function handleMessage(botToken, env, ctx, message) {
       || message.forward_from_chat?.title || message.forward_from?.first_name
       || replyOrigin.chat?.title || replyOrigin.sender_user?.first_name
       || replySenderChat?.title || replyForwardChat?.title || 'unknown';
-    const isMaliciousSource = BLACKLISTED_FORWARD_SOURCES.has(forwardSrc);
+    const isMaliciousSource = Array.from(BLACKLISTED_FORWARD_SOURCES).some(kw => forwardSrc.includes(kw));
 
     if (isMaliciousSource && userId) {
       log('info', 'Forward 黑名單來源攔截', { chatId, userId, forwardSrc });
@@ -102,7 +103,14 @@ export async function handleMessage(botToken, env, ctx, message) {
 
   // ── 規則 3：連結偵測 → 立即封禁（無警告）────────────────────
   const dynWhitelist = await getDynamicWhitelist(env, chatId);
-  const { hasTelegram, hasSuspicious, foundUrls } = analyzeMessage(message, dynWhitelist);
+  let { hasTelegram, hasSuspicious, foundUrls } = analyzeMessage(message, dynWhitelist);
+
+  // ── 新人 5 分鐘保護期：期間內任何連結皆殺 ──
+  const inCooldown = userId ? await isUserInCooldown(env, chatId, userId) : false;
+  if (inCooldown && foundUrls.length > 0) {
+    log('info', '新人保護期發連結攔截', { chatId, userId, foundUrls });
+    hasSuspicious = true;
+  }
 
   if (hasTelegram || hasSuspicious) {
     log('info', 'Link 違規', { chatId, userId, foundUrls });

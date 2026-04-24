@@ -15,6 +15,7 @@ import { t } from './i18n.js';
 import { log, sendTemporaryMessage } from './utils.js';
 import { generateViolationCSV, sendCSVDoc } from './report.js';
 import { handleMessage } from './message.js';
+import { recordUserJoinTime } from './store.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -50,6 +51,12 @@ export default {
       if (msg) {
         if (msg.new_chat_members) {
           const chatId = msg.chat.id;
+          
+          // 記錄所有新進成員的入群時間 (用於 5 分鐘保護期)
+          for (const member of msg.new_chat_members) {
+            ctx.waitUntil(recordUserJoinTime(env, chatId, member.id));
+          }
+
           const cooldownKey = `welcome_cooldown:${chatId}`;
           const isCooling = await env.TG_GUARD_KV.get(cooldownKey);
           if (!isCooling) {
