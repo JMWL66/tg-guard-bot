@@ -7,7 +7,7 @@ compatibility_date = "2025-01-01"
 
 [[kv_namespaces]]
 binding = "TG_GUARD_KV"
-id = "98c5eb64472944618ccd2eada8b9947c"
+id = "548d83f594b94dedb9778dad7f4d8099"
 
 [triggers]
 crons = ["0 0 * * *"]
