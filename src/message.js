@@ -1,6 +1,6 @@
 import { SYSTEM_BOT_IDS, WHITELISTED_USER_IDS, BLACKLISTED_FORWARD_SOURCES } from './config.js';
 import { t } from './i18n.js';
-import { log, deleteMessage, sendTemporaryMessage } from './utils.js';
+import { log, callTelegramAPI, deleteMessage, sendTemporaryMessage } from './utils.js';
 import { 
   getDynamicUserWhitelist, 
   getMemberStatus, 
@@ -105,11 +105,21 @@ export async function handleMessage(botToken, env, ctx, message) {
   const dynWhitelist = await getDynamicWhitelist(env, chatId);
   let { hasTelegram, hasSuspicious, foundUrls } = analyzeMessage(message, dynWhitelist);
 
-  // ── 新人 5 分鐘保護期：期間內任何連結皆殺 ──
+  // ── 新人 5 分鐘保護期：期間內任何連結 → 直接永久封禁（不走計數器）──
+  // 進群後立刻發連結 = 廣告機器人，無需多次機會
   const inCooldown = userId ? await isUserInCooldown(env, chatId, userId) : false;
   if (inCooldown && foundUrls.length > 0) {
-    log('info', '新人保護期發連結攔截', { chatId, userId, foundUrls });
-    hasSuspicious = true;
+    log('info', '新人保護期發連結 → 直接永久封禁', { chatId, userId, foundUrls });
+    await deleteMessage(botToken, chatId, message.message_id);
+    if (userId) {
+      // 直接傳入 count=3 跳過計數器，立即觸發永久封禁
+      await punishUser(botToken, env, chatId, message.from, 'link_newuser', 3);
+      ctx.waitUntil(
+        notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls, reason: 'link_newuser', originalText, count: 3 })
+      );
+      sendTemporaryMessage(botToken, chatId, t('kick_final'), ctx);
+    }
+    return;
   }
 
   if (hasTelegram || hasSuspicious) {
@@ -120,15 +130,15 @@ export async function handleMessage(botToken, env, ctx, message) {
       const actionType = await punishUser(botToken, env, chatId, message.from, 'link', count);
       const warnKey = actionType === 'mute_24h' ? 'warn_mute_24h' : actionType === 'mute_7d' ? 'warn_mute_7d' : 'kick_final';
 
-      ctx.waitUntil(Promise.all([
+      ctx.waitUntil(
         notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls, reason: 'link', originalText, count })
-      ]));
+      );
       sendTemporaryMessage(botToken, chatId, t(warnKey), ctx);
     }
     return;
   }
 
-  // ── 規則 3：洗版偵測（無 userId 無法追蹤，跳過）────────────────
+  // ── 規則 4：洗版偵測（無 userId 無法追蹤，跳過）────────────────
   if (!userId) return;
   const [isRateLimited, isDuplicate, isShortSpam] = await Promise.all([
     checkRateLimit(env, chatId, userId),
@@ -136,19 +146,37 @@ export async function handleMessage(botToken, env, ctx, message) {
     checkShortMessageSpam(env, chatId, userId, originalText)
   ]);
 
-  if (isRateLimited || isDuplicate || isShortSpam) {
-    const spamReason = isShortSpam ? '[short_msg]' : isRateLimited ? '[rate_limit]' : '[duplicate]';
-    const logReason = isShortSpam ? 'short' : 'spam';
-    const kickMsg = isShortSpam ? t('short_kick') : t('spam_kick');
-    log('info', 'Spam 違規封禁', { chatId, userId, spamReason });
+  // ── 無意義短訊息：獨立輕量處理，只刪消息，不觸發廣告計數器 ──
+  // 這樣不會讓短訊息「污染」用戶的廣告違規計數，避免下次發正常訊息就被過重處罰
+  if (isShortSpam) {
+    log('info', '無意義短訊息攔截（僅靜音1小時）', { chatId, userId });
+    await deleteMessage(botToken, chatId, message.message_id);
+    // 只做一次靜音 1 小時，不寫入廣告計數器
+    const now = Math.floor(Date.now() / 1000);
+    ctx.waitUntil(
+      callTelegramAPI(botToken, 'restrictChatMember', {
+        chat_id: chatId,
+        user_id: userId,
+        permissions: { can_send_messages: false },
+        until_date: now + 3600
+      })
+    );
+    sendTemporaryMessage(botToken, chatId, t('short_kick'), ctx);
+    return;
+  }
+
+  // ── 洗版/重複訊息：走廣告計數器（屬於惡意刷屏）──
+  if (isRateLimited || isDuplicate) {
+    const spamReason = isRateLimited ? '[rate_limit]' : '[duplicate]';
+    log('info', 'Spam 違規', { chatId, userId, spamReason });
     await deleteMessage(botToken, chatId, message.message_id);
     const count = await incrementViolations(env, chatId, userId);
-    const actionType = await punishUser(botToken, env, chatId, message.from, logReason, count);
+    const actionType = await punishUser(botToken, env, chatId, message.from, 'spam', count);
     const warnKey = actionType === 'mute_24h' ? 'warn_mute_24h' : actionType === 'mute_7d' ? 'warn_mute_7d' : 'kick_final';
 
-    ctx.waitUntil(Promise.all([
-      notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls: [spamReason], reason: logReason, originalText, count })
-    ]));
+    ctx.waitUntil(
+      notifyAdminLog(botToken, env, { chatId, userId, username: message.from?.username, foundUrls: [spamReason], reason: 'spam', originalText, count })
+    );
     sendTemporaryMessage(botToken, chatId, t(warnKey), ctx);
   }
 }
