@@ -1,4 +1,5 @@
 import { CONFIG, SYSTEM_BOT_IDS } from './config.js';
+
 import { callTelegramAPI, simpleHash } from './utils.js';
 
 export async function getMemberStatus(botToken, env, chatId, userId, senderChat) {
@@ -94,19 +95,35 @@ export async function recordUserJoinTime(env, chatId, userId) {
 
 export async function isUserInCooldown(env, chatId, userId) {
   const key = `join:${chatId}:${userId}`;
-  const joinTimeStr = await env.TG_GUARD_KV.get(key);
-  if (!joinTimeStr) return false; // 没有記錄，視為老用戶（安全回退）
-
+  const [joinTimeStr, highRiskFlag] = await Promise.all([
+    env.TG_GUARD_KV.get(key),
+    env.TG_GUARD_KV.get(`highrisk:${chatId}:${userId}`)
+  ]);
+  if (!joinTimeStr) return false;
   const joinTime = parseInt(joinTimeStr);
   const now = Math.floor(Date.now() / 1000);
-  // 5 分鐘 = 300 秒
-  return (now - joinTime) <= 300;
+  const window = highRiskFlag ? CONFIG.HIGHRISK_COOLDOWN : 5 * 60;
+  return (now - joinTime) <= window;
+}
+
+// 高風險帳號標記（無頭像 → 延長冷卻期至 30 分鐘）
+export async function markHighRisk(env, chatId, userId) {
+  await env.TG_GUARD_KV.put(`highrisk:${chatId}:${userId}`, '1', { expirationTtl: CONFIG.HIGHRISK_COOLDOWN + 60 });
+}
+
+// 訊息計數：用於「前 N 條訊息保護期」，返回本條之後的累計數
+export async function incrementMsgCount(env, chatId, userId) {
+  const key = `msgcount:${chatId}:${userId}`;
+  const count = parseInt(await env.TG_GUARD_KV.get(key) || '0') + 1;
+  // 保留 30 天
+  await env.TG_GUARD_KV.put(key, count.toString(), { expirationTtl: 30 * 24 * 3600 });
+  return count;
 }
 
 // ─── 自訂黑名單（KV 儲存，管理員可動態增刪）──────────────────
 // type ∈ 'link' | 'user' | 'forward' | 'kw'
 // link/user/forward 值為 string；kw 值為 string[]（AND 組合）
-const BL_TYPES = new Set(['link', 'user', 'forward', 'kw']);
+const BL_TYPES = new Set(['link', 'user', 'forward', 'kw', 'image']);
 
 export async function getCustomBlacklist(env, type) {
   if (!BL_TYPES.has(type)) return [];

@@ -1,9 +1,9 @@
-import { callTelegramAPI, log } from './utils.js';
+import { callTelegramAPI, escapeHtml, log } from './utils.js';
 
-// ─── 階梯式處罰（1: 24h禁媒體/連結, 2: 7d全禁, 3: 永久封鎖）───────
+// ─── 階梯式處罰（1: 24h禁媒體/連結, 2: 7d全禁, 3: 永久封鎖）──────
 export async function punishUser(botToken, env, chatId, user, reason, count) {
   if (!user || !user.id) return 'none';
-  
+
   const now = Math.floor(Date.now() / 1000);
   let method = 'restrictChatMember';
   let body = { chat_id: chatId, user_id: user.id };
@@ -46,65 +46,73 @@ export async function punishUser(botToken, env, chatId, user, reason, count) {
   const result = await callTelegramAPI(botToken, method, body);
   if (!result.ok) log('error', `處罰執行失敗: ${actionType}`, { result, body });
 
-  // 紀錄歷史 (metadata 中保留原始紀錄方便報表抓取)
+  // 紀錄歷史
   const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Deleted Account';
   await env.TG_GUARD_KV.put(`ban_hist:${chatId}:${user.id}`, `${reason} (${actionType})`, {
-    metadata: {
-      name,
-      username: user.username || '',
-      date: new Date().toISOString()
-    }
+    metadata: { name, username: user.username || '', date: new Date().toISOString() }
   });
-  
+
   return actionType;
 }
 
-// ─── 管理員日誌通知 ─────────────────────────────────────────────
-export async function notifyAdminLog(botToken, env, { chatId, userId, username, foundUrls, reason, originalText, count }) {
+// ─── 管理員日誌通知（HTML 格式，防止原文中的 * _ ` 破壞排版）──────
+export async function notifyAdminLog(botToken, env, {
+  chatId, userId, username, foundUrls, reason, originalText, count, fileUniqueId
+}) {
   const adminId = env.ADMIN_ID;
   if (!adminId) return;
 
   // ─── 存儲紀錄 ───
   try {
     const now = new Date();
-    const timestamp = now.getTime();
-    const isoDate = now.toISOString();
-    const logKey = `vlog:${timestamp}:${userId}`;
-    const logEntry = {
-      date: isoDate.split('T')[0],
-      timestamp: isoDate,
-      userId,
-      username: username || 'N/A',
-      reason,
-      originalText: originalText || '',
-      count
-    };
-    await env.TG_GUARD_KV.put(logKey, JSON.stringify(logEntry));
+    const logKey = `vlog:${now.getTime()}:${userId}`;
+    await env.TG_GUARD_KV.put(logKey, JSON.stringify({
+      date: now.toISOString().split('T')[0],
+      timestamp: now.toISOString(),
+      userId, username: username || 'N/A',
+      reason, originalText: originalText || '', count
+    }));
   } catch (e) {
     log('error', '儲存違規紀錄失敗', { error: e.message });
   }
 
-  // ─── 發送通知 ───
+  // ─── 發送通知（HTML）───
   const reasonMap = {
     forward: '轉發訊息',
     banned_source: '黑名單轉發源',
     link: '發送連結',
-    link_newuser: '新人發送連結',
+    link_newuser: '新人發連結（時間窗）',
+    link_firstmsg: '新人發連結（前N條）',
     keyword: '關鍵詞黑名單',
     spam: '洗版/重複',
     short: '無意義短訊息',
     cas: 'CAS 聯邦封禁',
-    sender_chat: '頻道身份發言'
+    sender_chat: '頻道身份發言',
+    image_bl: '圖片黑名單'
   };
+
   const preview = originalText
-    ? `\n📝 原文: \`${originalText.slice(0, 100)}${originalText.length > 100 ? '…' : ''}\``
+    ? `\n📝 原文: <code>${escapeHtml(originalText.slice(0, 120))}${originalText.length > 120 ? '…' : ''}</code>`
     : '';
-  const txt = `🚨 **違規活動记录**\n\n` +
-    `📍 群組: \`${chatId}\`\n` +
-    `👤 用戶: \`${userId}\` (${username || '無名氏'})\n` +
-    `⚡ 原因: ${reasonMap[reason] || reason}` +
+
+  const imgLine = fileUniqueId
+    ? `\n🖼 圖片ID: <code>${escapeHtml(fileUniqueId)}</code>\n   ↳ 拉黑: <code>/bladd image ${escapeHtml(fileUniqueId)}</code>`
+    : '';
+
+  const urlLine = foundUrls?.length
+    ? `\n🔗 內容: <code>${escapeHtml(foundUrls.join(', ').slice(0, 200))}</code>`
+    : '';
+
+  const txt = `🚨 <b>違規活動記錄</b>\n\n` +
+    `📍 群組: <code>${chatId}</code>\n` +
+    `👤 用戶: <code>${userId}</code> (${escapeHtml(username || '無名氏')})\n` +
+    `⚡ 原因: ${escapeHtml(reasonMap[reason] || reason)}` +
     preview +
-    `\n🔗 內容: \`${foundUrls.join(', ')}\`` +
+    urlLine +
+    imgLine +
     `\n⚠️ 累計次數: ${count}`;
-  await callTelegramAPI(botToken, 'sendMessage', { chat_id: adminId, text: txt, parse_mode: 'Markdown' });
+
+  await callTelegramAPI(botToken, 'sendMessage', {
+    chat_id: adminId, text: txt, parse_mode: 'HTML'
+  });
 }

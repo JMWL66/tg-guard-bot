@@ -35,6 +35,14 @@ export function normalizeText(text) {
   return text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
 }
 
+export function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function simpleHash(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;

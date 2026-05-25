@@ -10,6 +10,8 @@ export const CONFIG = {
   SHORT_MSG_WINDOW: 60,   // 秒：連續短訊息計數視窗
   VIOLATION_TTL: 7 * 24 * 3600, // 違規計數保留時間 (7天)
   CAPTCHA_TIMEOUT: 60,    // 秒：入群驗證超時，未點按鈕即踢出
+  FIRST_MSG_LIMIT: 5,    // 前 N 條訊息期間禁止發送連結/轉發
+  HIGHRISK_COOLDOWN: 30 * 60, // 秒：高風險帳號（無頭像）的冷卻期
   REGEX_URL: /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+|@\w{5,})/gi
 };
 

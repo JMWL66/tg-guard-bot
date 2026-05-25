@@ -17,6 +17,7 @@ import { recordUserJoinTime } from './store.js';
 import { startCaptcha, handleCaptchaCallback, sweepExpiredCaptchas, markVerified } from './captcha.js';
 import { checkCAS } from './cas.js';
 import { SYSTEM_BOT_IDS, WHITELISTED_USER_IDS } from './config.js';
+import { markHighRisk } from './store.js';
 
 async function isInviterAdmin(botToken, env, chatId, inviterId) {
   if (!inviterId) return false;
@@ -68,6 +69,19 @@ async function handleNewMembers(botToken, env, ctx, msg) {
 
     // 發 captcha
     await startCaptcha(botToken, env, chatId, member);
+
+    // 異步評估帳號風險（不阻塞主流程）：無頭像 → 高風險 → 30min 冷卻期
+    ctx.waitUntil((async () => {
+      try {
+        const photos = await callTelegramAPI(botToken, 'getUserProfilePhotos', {
+          user_id: member.id, limit: 1
+        });
+        if (photos.ok && photos.result.total_count === 0) {
+          await markHighRisk(env, chatId, member.id);
+          log('info', '高風險帳號（無頭像）→ 冷卻期延長', { chatId, userId: member.id });
+        }
+      } catch { /* 查詢失敗不影響主流程 */ }
+    })());
   }
 }
 

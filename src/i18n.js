@@ -32,8 +32,9 @@ const I18N = {
       "`/bladd user <username>` 加入用戶名（無需 @）\n" +
       "`/bladd forward <name>` 加入轉發源名稱\n" +
       "`/bladd kw 詞1,詞2,...` 加入關鍵詞 AND 組合\n" +
+      "`/bladd image <file_unique_id>` 拉黑垃圾圖片（ID 從日誌複製）\n" +
       "`/blrm <type> <值>` 移除\n" +
-      "`/bllist [type]` 查看\n\n" +
+      "`/bllist [type]` 查看（type 可選: link|user|forward|kw|image）\n\n" +
       "*封禁管理*\n" +
       "`/unban <uid>` · `/exportbans` · `/exportall`\n" +
       "`/resetviolations <uid>` · `/resetadmincache <uid>`\n" +

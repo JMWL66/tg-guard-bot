@@ -4,7 +4,7 @@ import { callTelegramAPI, deleteMessage, sendTemporaryMessage } from './utils.js
 import { getDynamicWhitelist, getDynamicUserWhitelist, getCustomBlacklist, addToBlacklist, removeFromBlacklist } from './store.js';
 import { generateViolationCSV, sendCSVDoc } from './report.js';
 
-const BL_TYPE_LABEL = { link: '邀請連結', user: '用戶名', forward: '轉發源', kw: '關鍵詞組合' };
+const BL_TYPE_LABEL = { link: '邀請連結', user: '用戶名', forward: '轉發源', kw: '關鍵詞組合', image: '圖片ID' };
 
 // 解析 /bladd 或 /blrm 的 value：kw 類型支援逗號分隔 → 陣列
 function parseBlValue(type, raw) {
