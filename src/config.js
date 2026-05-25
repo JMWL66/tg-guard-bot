@@ -28,7 +28,8 @@ export const BLACKLISTED_INVITE_LINKS = new Set([
   'https://t.me/+DydE0_0pr1c4NjY1',
   'https://t.me/+_20NHyKkibczZTU5',
   'https://t.me/+BCKNBdfXxAViM2Fh',
-  'https://t.me/+TUypbviU3i05ZTkx'
+  'https://t.me/+TUypbviU3i05ZTkx',
+  'https://t.me/+akoR4HR8AodkNjk9'
 ]);
 
 // 轉發來源黑名單：來自這些群組的轉發將直接永久封禁
@@ -118,4 +119,20 @@ export const KEYWORD_SETS = [
   ['朱桑', '内部群'],
   ['收获', '五连胜'],
   ['欢迎', '进群', '质检'],
+  // ── 圖中最新的垃圾信息特徵 ──
+  ['直播间精准捕捉'],
+  ['直播間精準捕捉'],
+  ['从横盘位置开始'],
+  ['從橫盤位置開始'],
+  ['到高点精准出场'],
+  ['到高點精準出場'],
+  ['币圈合约交流社区'],
+  ['幣圈合約交流社區'],
+  // ── 第二張圖的新特徵 ──
+  ['让openai升级到PLUS'],
+  ['讓openai升級到PLUS'],
+  ['SSkyGPTbot'],
+  ['Geminivip1'],
+  ['比特幣山寨合約策略'],
+  ['比特币山寨合约策略'],
 ];

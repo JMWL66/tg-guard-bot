@@ -59,7 +59,9 @@ export function analyzeMessage(message, dynamicWhitelist) {
       const fullPath = urlObj.pathname.toLowerCase() + urlObj.search.toLowerCase();
 
       // ── 1. 強制黑名單检查 (URL) ──
-      if (BLACKLISTED_INVITE_LINKS.has(normalizedUrl)) { hasSuspicious = true; break; }
+      // 改用「包含」檢查，防止參數規避 (?start= 等)
+      const isBlacklistedLink = Array.from(BLACKLISTED_INVITE_LINKS).some(link => normalizedUrl.includes(link));
+      if (isBlacklistedLink) { hasSuspicious = true; break; }
 
       if (domain === 't.me' || domain === 'telegram.me') {
         const username = fullPath.split('/')[1]?.split(/[?#]/)[0];
