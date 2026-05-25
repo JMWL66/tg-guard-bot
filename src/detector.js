@@ -2,7 +2,8 @@ import { CONFIG, KEYWORD_SETS, BLACKLISTED_INVITE_LINKS, BLACKLISTED_USERNAMES }
 import { normalizeText } from './utils.js';
 
 // 關鍵詞組合偵測：任一組內所有詞同時出現則命中
-export function matchesKeywordSet(text) {
+// keywordSets 可選，預設使用 config 中的 KEYWORD_SETS；可傳入合併後的列表
+export function matchesKeywordSet(text, keywordSets = KEYWORD_SETS) {
   if (!text) return false;
   const normalized = normalizeText(text);
 
@@ -10,7 +11,8 @@ export function matchesKeywordSet(text) {
   const checkCount = (text.match(/✅/g) || []).length;
   if (checkCount >= 4) return true;
 
-  return KEYWORD_SETS.some(set => {
+  return keywordSets.some(set => {
+    if (!Array.isArray(set) || set.length === 0) return false;
     // 將關鍵詞也正規化後進行比對，以應對空格/符號規避
     return set.every(kw => normalized.includes(normalizeText(kw)));
   });
@@ -45,7 +47,13 @@ export function extractUrls(message) {
   return Array.from(urls);
 }
 
-export function analyzeMessage(message, dynamicWhitelist) {
+// blacklistedLinks / blacklistedUsernames 為合併後的 Set，由呼叫端組合 config + KV
+export function analyzeMessage(
+  message,
+  dynamicWhitelist,
+  blacklistedLinks = BLACKLISTED_INVITE_LINKS,
+  blacklistedUsernames = BLACKLISTED_USERNAMES
+) {
   const urls = extractUrls(message);
   let hasTelegram = false;
   let hasSuspicious = false;
@@ -60,29 +68,27 @@ export function analyzeMessage(message, dynamicWhitelist) {
 
       // ── 1. 強制黑名單检查 (URL) ──
       // 改用「包含」檢查，防止參數規避 (?start= 等)
-      const isBlacklistedLink = Array.from(BLACKLISTED_INVITE_LINKS).some(link => normalizedUrl.includes(link));
+      const isBlacklistedLink = Array.from(blacklistedLinks).some(link => normalizedUrl.includes(link));
       if (isBlacklistedLink) { hasSuspicious = true; break; }
 
       if (domain === 't.me' || domain === 'telegram.me') {
         const username = fullPath.split('/')[1]?.split(/[?#]/)[0];
         // ── 2. 黑名單用戶名檢查 ──
-        if (username && BLACKLISTED_USERNAMES.has(username.replace(/^@/, ''))) { 
-          hasTelegram = true; 
-          break; 
+        if (username && blacklistedUsernames.has(username.replace(/^@/, ''))) {
+          hasTelegram = true;
+          break;
         }
 
         // ── 3. 通用邀請連結檢查 (spam 防禦) ──
         const isInvite = fullPath.startsWith('/joinchat/') || fullPath.startsWith('/+');
         if (isInvite) {
-          hasTelegram = true; break; 
+          hasTelegram = true; break;
         }
         // 准許普通 @username 或頻道連結
       } else if (domain !== 'telegram.org') {
         // ── 4. 外部域名檢查 ──
-        // 如果不在白名單且是「可疑」行為（此處可根据需求調整，目前用戶要求放行其他鏈接）
-        // 我們僅在特定情況下標記 Suspicious，否則准許
         const isWhitelisted = fullWhitelist.some(allowed => domain === allowed || domain.endsWith(`.${allowed}`));
-        // hasSuspicious = false; // 默認准許
+        // 預設准許其他鏈接（保留延展空間）
       }
     } catch { }
   }

@@ -96,9 +96,47 @@ export async function isUserInCooldown(env, chatId, userId) {
   const key = `join:${chatId}:${userId}`;
   const joinTimeStr = await env.TG_GUARD_KV.get(key);
   if (!joinTimeStr) return false; // 没有記錄，視為老用戶（安全回退）
-  
+
   const joinTime = parseInt(joinTimeStr);
   const now = Math.floor(Date.now() / 1000);
   // 5 分鐘 = 300 秒
   return (now - joinTime) <= 300;
+}
+
+// ─── 自訂黑名單（KV 儲存，管理員可動態增刪）──────────────────
+// type ∈ 'link' | 'user' | 'forward' | 'kw'
+// link/user/forward 值為 string；kw 值為 string[]（AND 組合）
+const BL_TYPES = new Set(['link', 'user', 'forward', 'kw']);
+
+export async function getCustomBlacklist(env, type) {
+  if (!BL_TYPES.has(type)) return [];
+  const data = await env.TG_GUARD_KV.get(`bl:${type}`);
+  if (!data) return [];
+  try {
+    const arr = JSON.parse(data);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+export async function addToBlacklist(env, type, value) {
+  if (!BL_TYPES.has(type)) return null;
+  const list = await getCustomBlacklist(env, type);
+  // kw 用 JSON 字串比對唯一性，避免重複加入
+  const serialize = (v) => typeof v === 'string' ? v : JSON.stringify(v);
+  const exists = list.some(item => serialize(item) === serialize(value));
+  if (!exists) {
+    list.push(value);
+    await env.TG_GUARD_KV.put(`bl:${type}`, JSON.stringify(list));
+  }
+  return list;
+}
+
+export async function removeFromBlacklist(env, type, value) {
+  if (!BL_TYPES.has(type)) return null;
+  const list = await getCustomBlacklist(env, type);
+  const serialize = (v) => typeof v === 'string' ? v : JSON.stringify(v);
+  const target = serialize(value);
+  const next = list.filter(item => serialize(item) !== target);
+  await env.TG_GUARD_KV.put(`bl:${type}`, JSON.stringify(next));
+  return next;
 }

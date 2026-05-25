@@ -85,7 +85,17 @@ export async function notifyAdminLog(botToken, env, { chatId, userId, username, 
   }
 
   // ─── 發送通知 ───
-  const reasonMap = { forward: '轉發訊息', link: '發送連結', keyword: '關鍵詞黑名單', spam: '洗版/重複', short: '無意義短訊息' };
+  const reasonMap = {
+    forward: '轉發訊息',
+    banned_source: '黑名單轉發源',
+    link: '發送連結',
+    link_newuser: '新人發送連結',
+    keyword: '關鍵詞黑名單',
+    spam: '洗版/重複',
+    short: '無意義短訊息',
+    cas: 'CAS 聯邦封禁',
+    sender_chat: '頻道身份發言'
+  };
   const preview = originalText
     ? `\n📝 原文: \`${originalText.slice(0, 100)}${originalText.length > 100 ? '…' : ''}\``
     : '';

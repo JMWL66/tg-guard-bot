@@ -1,8 +1,27 @@
 import { WHITELISTED_USER_IDS } from './config.js';
 import { t } from './i18n.js';
 import { callTelegramAPI, deleteMessage, sendTemporaryMessage } from './utils.js';
-import { getDynamicWhitelist, getDynamicUserWhitelist } from './store.js';
+import { getDynamicWhitelist, getDynamicUserWhitelist, getCustomBlacklist, addToBlacklist, removeFromBlacklist } from './store.js';
 import { generateViolationCSV, sendCSVDoc } from './report.js';
+
+const BL_TYPE_LABEL = { link: '邀請連結', user: '用戶名', forward: '轉發源', kw: '關鍵詞組合' };
+
+// 解析 /bladd 或 /blrm 的 value：kw 類型支援逗號分隔 → 陣列
+function parseBlValue(type, raw) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return null;
+  if (type === 'kw') {
+    const parts = trimmed.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    return parts.length > 0 ? parts : null;
+  }
+  if (type === 'user') return trimmed.replace(/^@/, '').toLowerCase();
+  return trimmed;
+}
+
+function formatBlEntry(type, item) {
+  if (type === 'kw' && Array.isArray(item)) return item.join(' + ');
+  return String(item);
+}
 
 export async function handleAdminCommands(botToken, env, ctx, message, status) {
   const isAdmin = status === 'creator' || status === 'administrator';
@@ -12,7 +31,7 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
   const chatId = message.chat.id;
   const text = rawText.replace(/\/\w+@\w+/, (m) => m.split('@')[0]);
 
-  const cmdPrefixes = ['/allow ', '/disallow ', '/allowuser ', '/disallowuser ', '/listwhitelist', '/unban ', '/exportbans', '/resetviolations ', '/resetadmincache', '/help', '/exportall', '/getexporturl'];
+  const cmdPrefixes = ['/allow ', '/disallow ', '/allowuser ', '/disallowuser ', '/listwhitelist', '/unban ', '/exportbans', '/resetviolations ', '/resetadmincache', '/help', '/exportall', '/getexporturl', '/bladd ', '/blrm ', '/bllist'];
   const matched = cmdPrefixes.some(p => text.startsWith(p) || text === p.trim());
   if (!matched) return false;
 
@@ -155,6 +174,44 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
     const secret = env.EXPORT_SECRET || 'PLEASE_SET_EXPORT_SECRET';
     const host = message.chat.type === 'private' ? 'https://your-worker-url.workers.dev' : ''; // 這裡無法精確得知 URL，提示用戶
     sendMessage(`🌐 **累積違規報表下載連結：**\n\n請造訪以下網址（建議電腦開啟）：\n\`${host}/export?token=${secret}\`\n\n⚠️ *請將網址中的 your-worker-url 替換為您的 Worker 實際網址。*`);
+  } else if (text.startsWith('/bladd ')) {
+    // /bladd <type> <value...>
+    const parts = text.slice('/bladd '.length).trim().split(/\s+/);
+    const type = parts.shift();
+    const raw = parts.join(' ');
+    const value = parseBlValue(type, raw);
+    if (!type || !BL_TYPE_LABEL[type] || !value) {
+      sendMessage('⚠️ 用法：`/bladd <link|user|forward|kw> <值>`\nkw 多詞用逗號分隔（AND 組合）');
+    } else {
+      await addToBlacklist(env, type, value);
+      sendMessage(`✅ 已加入${BL_TYPE_LABEL[type]}黑名單：\`${formatBlEntry(type, value)}\``);
+    }
+  } else if (text.startsWith('/blrm ')) {
+    const parts = text.slice('/blrm '.length).trim().split(/\s+/);
+    const type = parts.shift();
+    const raw = parts.join(' ');
+    const value = parseBlValue(type, raw);
+    if (!type || !BL_TYPE_LABEL[type] || !value) {
+      sendMessage('⚠️ 用法：`/blrm <link|user|forward|kw> <值>`');
+    } else {
+      const next = await removeFromBlacklist(env, type, value);
+      sendMessage(`❌ 已移除${BL_TYPE_LABEL[type]}：\`${formatBlEntry(type, value)}\`\n剩餘：${next.length} 條`);
+    }
+  } else if (text.startsWith('/bllist')) {
+    const arg = text.slice('/bllist'.length).trim();
+    const types = arg && BL_TYPE_LABEL[arg] ? [arg] : Object.keys(BL_TYPE_LABEL);
+    let out = '📋 *自訂黑名單清單：*\n';
+    for (const type of types) {
+      const list = await getCustomBlacklist(env, type);
+      out += `\n*${BL_TYPE_LABEL[type]}* (${list.length})\n`;
+      if (list.length === 0) {
+        out += '_(空)_\n';
+      } else {
+        out += list.slice(0, 30).map(it => `• \`${formatBlEntry(type, it)}\``).join('\n') + '\n';
+        if (list.length > 30) out += `_… 還有 ${list.length - 30} 條_\n`;
+      }
+    }
+    sendMessage(out);
   } else if (text === '/help') {
     sendMessage(t('help'));
   }

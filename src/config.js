@@ -9,6 +9,7 @@ export const CONFIG = {
   SHORT_MSG_MAX: 3,       // 連續短訊息達此次數踢出
   SHORT_MSG_WINDOW: 60,   // 秒：連續短訊息計數視窗
   VIOLATION_TTL: 7 * 24 * 3600, // 違規計數保留時間 (7天)
+  CAPTCHA_TIMEOUT: 60,    // 秒：入群驗證超時，未點按鈕即踢出
   REGEX_URL: /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+|@\w{5,})/gi
 };
 

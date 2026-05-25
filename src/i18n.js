@@ -22,17 +22,22 @@ const I18N = {
     unban_fail: "⚠️ 解封失敗，請確認 UID 是否正確。",
     export_bans: "📋 **封禁名單：**\n已生成封禁人員名單如下：",
     no_bans: "📭 目前尚無封禁记录。",
-    help: "📕 **管理員常用指令：**\n" +
-      "`/allow <domain>` - 放行特定域名\n" +
-      "`/disallow <domain>` - 撤回放行域名\n" +
-      "`/allowuser <uid>` - 放行特定用戶\n" +
-      "`/disallowuser <uid>` - 撤回放行用戶\n" +
-      "`/listwhitelist` - 查看所有白名單\n" +
-      "`/unban <uid>` - 解封被封禁的成員\n" +
-      "`/exportbans` - 匯出所有封禁名冊\n" +
-      "`/resetviolations <uid>` - 清空違規紀錄\n" +
-      "`/resetadmincache <uid>` - 重置管理員快取\n" +
-      "`/help` - 顯示此說明",
+    help: "📕 **管理員指令：**\n\n" +
+      "*白名單*\n" +
+      "`/allow <domain>` · `/disallow <domain>`\n" +
+      "`/allowuser <uid>` · `/disallowuser <uid>`\n" +
+      "`/listwhitelist`\n\n" +
+      "*黑名單（動態增刪，無需改代碼）*\n" +
+      "`/bladd link <url>` 加入邀請連結\n" +
+      "`/bladd user <username>` 加入用戶名（無需 @）\n" +
+      "`/bladd forward <name>` 加入轉發源名稱\n" +
+      "`/bladd kw 詞1,詞2,...` 加入關鍵詞 AND 組合\n" +
+      "`/blrm <type> <值>` 移除\n" +
+      "`/bllist [type]` 查看\n\n" +
+      "*封禁管理*\n" +
+      "`/unban <uid>` · `/exportbans` · `/exportall`\n" +
+      "`/resetviolations <uid>` · `/resetadmincache <uid>`\n" +
+      "`/help`",
     warn_mute_24h: "⚠️ **首次違規警告**\n該用戶已被禁言 **24 小時**。期間仍可發送純文字訊息，但禁止發送連結、轉發與媒體內容。",
     warn_mute_7d: "⚠️ **二次違規警告**\n該用戶已被**完全禁言 7 天**，期間禁止在本群發送任何訊息。",
     kick_final: "🚫 **多次違規處分**\n該用戶已累計 3 次或更多違規，已被永久移出群組。"

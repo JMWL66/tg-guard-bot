@@ -1,26 +1,80 @@
 /**
- * tg-guard-bot — Cloudflare Workers Telegram 群組守衛機器人 (終極究極版)
+ * tg-guard-bot — Cloudflare Workers Telegram 群組守衛機器人
  *
- * 功能核心：
- *  1. 🛡️ 新成員引導：入群歡迎與保護期提示
- *  2. ⚡ 極致效能：條件式讀取 KV，管理員狀態精準快取 (1h)
- *  3. ♻️ 權限同步：支援 /resetadmincache
- *  4. 🧹 隱形執行：指令執行後自動刪除，保持群組版面純淨
- *  5. 🔍 深度掃描：Regex + Telegram Entities 雙重過濾
- *  6. 🚫 零容忍：Forward / 連結 / 洗版 → 立即踢出，無警告
+ * 防禦層級：
+ *  0. 入群 CAPTCHA：60s 內未點按鈕自動踢出
+ *  1. CAS 聯邦封禁庫：命中即永封
+ *  2. sender_chat 外部頻道身份發言：直接封禁
+ *  3. 黑名單轉發來源 / 邀請連結 / 用戶名 / 關鍵詞組合
+ *  4. 洗版 / 重複 / 短訊息計數器
+ *  5. 階梯式處罰：24h 靜音 → 7d 靜音 → 永封
  */
 
-import { CONFIG } from './config.js';
-import { t } from './i18n.js';
-import { log, sendTemporaryMessage } from './utils.js';
+import { log, callTelegramAPI } from './utils.js';
 import { generateViolationCSV, sendCSVDoc } from './report.js';
 import { handleMessage } from './message.js';
 import { recordUserJoinTime } from './store.js';
+import { startCaptcha, handleCaptchaCallback, sweepExpiredCaptchas, markVerified } from './captcha.js';
+import { checkCAS } from './cas.js';
+import { SYSTEM_BOT_IDS, WHITELISTED_USER_IDS } from './config.js';
+
+async function isInviterAdmin(botToken, env, chatId, inviterId) {
+  if (!inviterId) return false;
+  if (SYSTEM_BOT_IDS.has(inviterId)) return true;
+  const cacheKey = `admin_cache:${chatId}:${inviterId}`;
+  const cached = await env.TG_GUARD_KV.get(cacheKey);
+  if (cached === 'creator' || cached === 'administrator') return true;
+  const result = await callTelegramAPI(botToken, 'getChatMember', { chat_id: chatId, user_id: inviterId });
+  if (result.ok && (result.result.status === 'creator' || result.result.status === 'administrator')) {
+    await env.TG_GUARD_KV.put(cacheKey, result.result.status, { expirationTtl: 3600 });
+    return true;
+  }
+  return false;
+}
+
+async function handleNewMembers(botToken, env, ctx, msg) {
+  const chatId = msg.chat.id;
+  const inviterId = msg.from?.id;
+  const inviterIsAdmin = await isInviterAdmin(botToken, env, chatId, inviterId);
+
+  for (const member of msg.new_chat_members) {
+    if (!member?.id) continue;
+
+    // bot 加入：跳過 captcha，不做 CAS（CAS 只查 user）
+    if (member.is_bot) {
+      ctx.waitUntil(recordUserJoinTime(env, chatId, member.id));
+      continue;
+    }
+
+    ctx.waitUntil(recordUserJoinTime(env, chatId, member.id));
+
+    // CAS：命中直接 ban，無需 captcha
+    const cas = await checkCAS(env, member.id);
+    if (cas.banned) {
+      log('info', 'CAS 入群攔截', { chatId, userId: member.id, offenses: cas.offenses });
+      await callTelegramAPI(botToken, 'banChatMember', { chat_id: chatId, user_id: member.id });
+      continue;
+    }
+
+    // 管理員手動拉入 / 白名單用戶：跳過 captcha 並標記已驗證
+    if (inviterIsAdmin && inviterId !== member.id) {
+      ctx.waitUntil(markVerified(env, chatId, member.id));
+      continue;
+    }
+    if (WHITELISTED_USER_IDS.has(member.id)) {
+      ctx.waitUntil(markVerified(env, chatId, member.id));
+      continue;
+    }
+
+    // 發 captcha
+    await startCaptcha(botToken, env, chatId, member);
+  }
+}
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
+
     // ─── 網頁匯出處理 ───
     if (url.pathname === '/export') {
       const token = url.searchParams.get('token');
@@ -39,30 +93,24 @@ export default {
     if (request.method !== 'POST') return new Response('OK', { status: 200 });
     const botToken = env.BOT_TOKEN;
     if (!botToken) return new Response('Miss BOT_TOKEN', { status: 500 });
-    
-    // ... 後續邏輯
+
     if (env.WEBHOOK_SECRET_TOKEN && request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET_TOKEN) {
       return new Response('Unauthorized', { status: 403 });
     }
 
     try {
       const update = await request.json();
+
+      // ─── Callback Query：處理 captcha 按鈕點擊 ───
+      if (update.callback_query) {
+        await handleCaptchaCallback(botToken, env, update.callback_query);
+        return new Response('OK', { status: 200 });
+      }
+
       const msg = update.message || update.edited_message || update.channel_post;
       if (msg) {
         if (msg.new_chat_members) {
-          const chatId = msg.chat.id;
-          
-          // 記錄所有新進成員的入群時間 (用於 5 分鐘保護期)
-          for (const member of msg.new_chat_members) {
-            ctx.waitUntil(recordUserJoinTime(env, chatId, member.id));
-          }
-
-          const cooldownKey = `welcome_cooldown:${chatId}`;
-          const isCooling = await env.TG_GUARD_KV.get(cooldownKey);
-          if (!isCooling) {
-            await env.TG_GUARD_KV.put(cooldownKey, '1', { expirationTtl: CONFIG.WELCOME_COOLDOWN_SEC });
-            sendTemporaryMessage(botToken, chatId, t('welcome'), ctx);
-          }
+          await handleNewMembers(botToken, env, ctx, msg);
         }
         if (!msg.new_chat_members && !msg.left_chat_member && !msg.pinned_message) {
           await handleMessage(botToken, env, ctx, msg);
@@ -74,15 +122,30 @@ export default {
 
   async scheduled(event, env, ctx) {
     const botToken = env.BOT_TOKEN;
-    const adminId = env.ADMIN_ID;
-    if (!botToken || !adminId) return;
+    if (!botToken) return;
 
-    try {
-      const csv = await generateViolationCSV(env);
-      await sendCSVDoc(botToken, adminId, csv, `daily_all_history_${new Date().toISOString().split('T')[0]}.csv`);
-      log('info', '每日全量報表已發送');
-    } catch (e) {
-      log('error', '每日報表發送失敗', { error: e.message });
+    // 每分鐘：掃描超時 captcha
+    if (event.cron === '* * * * *') {
+      try {
+        const kicked = await sweepExpiredCaptchas(botToken, env);
+        if (kicked > 0) log('info', 'Captcha sweep done', { kicked });
+      } catch (e) {
+        log('error', 'Captcha sweep failed', { error: e.message });
+      }
+      return;
+    }
+
+    // 每日 00:00 UTC：發送違規報表
+    if (event.cron === '0 0 * * *') {
+      const adminId = env.ADMIN_ID;
+      if (!adminId) return;
+      try {
+        const csv = await generateViolationCSV(env);
+        await sendCSVDoc(botToken, adminId, csv, `daily_all_history_${new Date().toISOString().split('T')[0]}.csv`);
+        log('info', '每日全量報表已發送');
+      } catch (e) {
+        log('error', '每日報表發送失敗', { error: e.message });
+      }
     }
   }
 };
