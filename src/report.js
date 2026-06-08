@@ -2,19 +2,29 @@ export async function generateViolationCSV(env) {
   let allLogs = [];
   
   // ─── 1. 獲取新版詳細紀錄 (vlog:) ───
+  // 優先讀 list() 回傳的 metadata（零額外 get）；舊紀錄無 metadata 時才回退讀 value
   let cursor;
   do {
     const list = await env.TG_GUARD_KV.list({ prefix: 'vlog:', cursor });
     for (const key of list.keys) {
-      const val = await env.TG_GUARD_KV.get(key.name);
-      if (val) {
-        try { allLogs.push(JSON.parse(val)); } catch (e) {}
+      const m = key.metadata;
+      if (m && m.userId) {
+        allLogs.push({
+          date: m.date, timestamp: m.timestamp, userId: m.userId,
+          username: m.username, reason: m.reason,
+          originalText: m.text || '', count: m.count
+        });
+      } else {
+        const val = await env.TG_GUARD_KV.get(key.name);
+        if (val) { try { allLogs.push(JSON.parse(val)); } catch (e) {} }
       }
     }
     cursor = list.list_complete ? undefined : list.cursor;
   } while (cursor);
 
   // ─── 2. 獲取舊版紀錄 (ban_hist:) 並合併 ───
+  // 預先建立已見 userId 集合，避免在迴圈內做 O(n²) 掃描
+  const seenUserIds = new Set(allLogs.map(l => String(l.userId)));
   let banCursor;
   do {
     const list = await env.TG_GUARD_KV.list({ prefix: 'ban_hist:', cursor: banCursor });
@@ -22,9 +32,10 @@ export async function generateViolationCSV(env) {
       const parts = key.name.split(':');
       const userId = parts.pop();
       const chatId = parts.pop();
-      
+
       // 避免重複（如果已經在 vlog 中有了）
-      if (allLogs.some(l => String(l.userId) === String(userId))) continue;
+      if (seenUserIds.has(String(userId))) continue;
+      seenUserIds.add(String(userId));
 
       const reason = await env.TG_GUARD_KV.get(key.name);
       const m = key.metadata || {};

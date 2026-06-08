@@ -21,9 +21,10 @@ export async function getMemberStatus(botToken, env, chatId, userId, senderChat)
   const result = await callTelegramAPI(botToken, 'getChatMember', { chat_id: chatId, user_id: userId });
   if (result.ok) {
     const status = result.result.status;
-    if (status === 'creator' || status === 'administrator') {
-      await env.TG_GUARD_KV.put(cacheKey, status, { expirationTtl: CONFIG.ADMIN_CACHE_TTL });
-    }
+    // 管理員緩存較久；普通成員短期緩存（降級/升級最多延遲 MEMBER_CACHE_TTL 生效）
+    const isAdmin = status === 'creator' || status === 'administrator';
+    const ttl = isAdmin ? CONFIG.ADMIN_CACHE_TTL : CONFIG.MEMBER_CACHE_TTL;
+    await env.TG_GUARD_KV.put(cacheKey, status, { expirationTtl: ttl });
     return status;
   }
   return 'member';

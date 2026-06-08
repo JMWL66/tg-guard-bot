@@ -2,7 +2,7 @@ export function log(level, message, data = {}) {
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), level, message, ...data }));
 }
 
-export async function callTelegramAPI(botToken, method, body) {
+export async function callTelegramAPI(botToken, method, body, attempt = 0) {
   const url = `https://api.telegram.org/bot${botToken}/${method}`;
   const response = await fetch(url, {
     method: 'POST',
@@ -10,7 +10,16 @@ export async function callTelegramAPI(botToken, method, body) {
     body: JSON.stringify(body),
   });
   const result = await response.json();
-  if (!result.ok) log('error', `API 失敗: ${method}`, { result, body });
+  if (!result.ok) {
+    // 429 限流：依 retry_after 退避重試（上限 5s、最多 2 次），避免刷屏時刪除/封禁被靜默丟棄
+    if (result.error_code === 429 && attempt < 2) {
+      const retryAfter = Math.min(result.parameters?.retry_after ?? 1, 5);
+      log('warn', `API 429 限流，${retryAfter}s 後重試: ${method}`, { attempt });
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      return callTelegramAPI(botToken, method, body, attempt + 1);
+    }
+    log('error', `API 失敗: ${method}`, { result, body });
+  }
   return result;
 }
 

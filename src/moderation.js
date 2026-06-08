@@ -1,4 +1,5 @@
 import { callTelegramAPI, escapeHtml, log } from './utils.js';
+import { CONFIG } from './config.js';
 
 // ─── 階梯式處罰（1: 24h禁媒體/連結, 2: 7d全禁, 3: 永久封鎖）──────
 export async function punishUser(botToken, env, chatId, user, reason, count) {
@@ -46,9 +47,10 @@ export async function punishUser(botToken, env, chatId, user, reason, count) {
   const result = await callTelegramAPI(botToken, method, body);
   if (!result.ok) log('error', `處罰執行失敗: ${actionType}`, { result, body });
 
-  // 紀錄歷史
+  // 紀錄歷史（加 TTL 防止 KV 無限膨脹）
   const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Deleted Account';
   await env.TG_GUARD_KV.put(`ban_hist:${chatId}:${user.id}`, `${reason} (${actionType})`, {
+    expirationTtl: CONFIG.BAN_HIST_TTL,
     metadata: { name, username: user.username || '', date: new Date().toISOString() }
   });
 
@@ -63,15 +65,27 @@ export async function notifyAdminLog(botToken, env, {
   if (!adminId) return;
 
   // ─── 存儲紀錄 ───
+  // 摘要同時寫入 KV metadata，讓報表匯出可直接從 list() 讀取、免逐條 get（避開子請求上限）
+  // value 仍保留完整原文供需要時細查；TTL 防止無限膨脹
   try {
     const now = new Date();
     const logKey = `vlog:${now.getTime()}:${userId}`;
-    await env.TG_GUARD_KV.put(logKey, JSON.stringify({
+    const logData = {
       date: now.toISOString().split('T')[0],
       timestamp: now.toISOString(),
       userId, username: username || 'N/A',
       reason, originalText: originalText || '', count
-    }));
+    };
+    const meta = {
+      date: logData.date, timestamp: logData.timestamp,
+      userId: String(userId ?? ''), username: logData.username,
+      reason, count,
+      text: (originalText || '').slice(0, 120) // metadata 上限 1024B，原文截斷
+    };
+    await env.TG_GUARD_KV.put(logKey, JSON.stringify(logData), {
+      expirationTtl: CONFIG.VLOG_TTL,
+      metadata: meta
+    });
   } catch (e) {
     log('error', '儲存違規紀錄失敗', { error: e.message });
   }

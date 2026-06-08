@@ -1,6 +1,9 @@
 export const CONFIG = {
   LANG: 'zh',
   ADMIN_CACHE_TTL: 3600,
+  MEMBER_CACHE_TTL: 600,  // 秒：普通成員身份緩存，避免每條訊息都打 getChatMember
+  VLOG_TTL: 90 * 24 * 3600,    // 違規明細紀錄保留 90 天（防止 KV 無限膨脹）
+  BAN_HIST_TTL: 180 * 24 * 3600, // 封禁歷史保留 180 天
   WELCOME_COOLDOWN_SEC: 10,
   RATE_LIMIT_WINDOW: 30,  // 秒：滑動視窗
   RATE_LIMIT_MAX: 5,      // 視窗內最大訊息數
