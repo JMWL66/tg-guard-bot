@@ -86,6 +86,20 @@ export async function checkShortMessageSpam(env, chatId, userId, text) {
   return count >= CONFIG.SHORT_MSG_MAX;
 }
 
+// 無意義噪音訊息計數：遇有意義訊息即清零，僅機器人式「純噪音 drip」會累加
+// isNoise 由 detector.isNoiseMessage 判定；返回視窗內累計噪音數
+export async function checkNoiseSpam(env, chatId, userId, isNoise) {
+  const key = `noise:${chatId}:${userId}`;
+  if (!isNoise) {
+    // 正常訊息 → 重置（fire-and-forget，不阻塞主流程）
+    env.TG_GUARD_KV.delete(key);
+    return 0;
+  }
+  const count = parseInt(await env.TG_GUARD_KV.get(key) || '0') + 1;
+  await env.TG_GUARD_KV.put(key, count.toString(), { expirationTtl: CONFIG.NOISE_MSG_WINDOW });
+  return count;
+}
+
 export async function recordUserJoinTime(env, chatId, userId) {
   const key = `join:${chatId}:${userId}`;
   const now = Math.floor(Date.now() / 1000);

@@ -24,27 +24,66 @@ export function hasMultiCheckmark(text) {
   return (text.match(/✅/g) || []).length > 1;
 }
 
+// 無意義噪音訊息偵測：純數字 / 純字母 / 單字重複 / 數字字母亂碼
+// （機器人常見手法：每隔一段時間發一條 "879"、"9527" 之類的填充訊息）
+// 為降低誤殺，僅針對「不含中日韓文字、長度短」的訊息；
+// 真正的處罰由 store.checkNoiseSpam 的「遇正常訊息即清零」長窗計數器把關，
+// 因此偶爾發一句 "666" / "ok" 並不會被處理。
+export function isNoiseMessage(text) {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // 含中日韓文字 → 視為有意義（"好的"、"哈哈" 等正常短回覆）
+  if (/[一-鿿぀-ヿ가-힯]/.test(trimmed)) return false;
+
+  // 單一字元重複 ≥3 次（1111、aaaa、。。。、====）
+  if (/^(.)\1{2,}$/u.test(trimmed)) return true;
+
+  // 去除空白 / 標點 / 符號後的核心內容
+  const core = trimmed.replace(/[\s\p{P}\p{S}]/gu, '');
+  if (!core) return false;            // 純符號 / 純 emoji → 不處理（避免誤殺表情回覆）
+  if (core.length > 12) return false; // 較長內容視為正常句子
+
+  // 純數字（879、9527）
+  if (/^\d+$/.test(core)) return true;
+  // 純英文字母短串（asdf、qweqwe…）
+  if (/^[a-zA-Z]+$/.test(core)) return true;
+  // 數字 + 字母混合的短亂碼（a1b2、x9k…）
+  if (/^[a-zA-Z0-9]+$/.test(core) && /\d/.test(core) && /[a-zA-Z]/.test(core)) return true;
+
+  return false;
+}
+
+// 回傳 [{ url, isMention }]：
+//   isMention=true  → 單純 @用戶名 提及（例如 @群友），社交行為
+//   isMention=false → 真實連結（http、t.me 邀請、寫出來的 t.me/xxx、外部域名等）
+// 仍會把 mention 轉成 t.me 連結以便比對黑名單用戶名，但用 isMention 標記區分用途。
 export function extractUrls(message) {
-  const urls = new Set();
+  const map = new Map(); // url → isMention（同一 url 若同時來自真連結與提及，真連結優先）
+  const add = (url, isMention) => {
+    if (map.has(url)) { if (!isMention) map.set(url, false); }
+    else map.set(url, isMention);
+  };
   const text = message.text || message.caption || '';
   // 合併 text 與 caption 的 entities，避免 [] 為 truthy 導致 caption_entities 被忽略
   const entities = [...(message.entities || []), ...(message.caption_entities || [])];
 
   for (const entity of entities) {
     const part = text.substring(entity.offset, entity.offset + entity.length);
-    if (entity.type === 'url') urls.add(part);
-    else if (entity.type === 'text_link' && entity.url) urls.add(entity.url);
-    else if (entity.type === 'mention') urls.add(`https://t.me/${part.substring(1)}`);
+    if (entity.type === 'url') add(part, false);
+    else if (entity.type === 'text_link' && entity.url) add(entity.url, false);
+    else if (entity.type === 'mention') add(`https://t.me/${part.substring(1)}`, true);
   }
   const matches = text.matchAll(CONFIG.REGEX_URL);
   for (const match of matches) {
     const url = match[0];
-    if (url.startsWith('@')) urls.add(`https://t.me/${url.substring(1)}`);
-    else urls.add(url);
+    if (url.startsWith('@')) add(`https://t.me/${url.substring(1)}`, true);
+    else add(url, false);
   }
   // 兼容舊版 Bot API 的 web_page 字段（某些 Telegram 版本仍會附帶）
-  if (message.web_page?.url) urls.add(message.web_page.url);
-  return Array.from(urls);
+  if (message.web_page?.url) add(message.web_page.url, false);
+  return Array.from(map, ([url, isMention]) => ({ url, isMention }));
 }
 
 // blacklistedLinks / blacklistedUsernames 為合併後的 Set，由呼叫端組合 config + KV
@@ -57,9 +96,11 @@ export function analyzeMessage(
   const urls = extractUrls(message);
   let hasTelegram = false;
   let hasSuspicious = false;
+  // 是否含「真實連結」（非單純 @提及）：新人保護期據此判斷，@群友放行
+  const hasRealLink = urls.some(u => !u.isMention);
   const fullWhitelist = [...dynamicWhitelist];
 
-  for (const url of urls) {
+  for (const { url } of urls) {
     try {
       const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
       const urlObj = new URL(normalizedUrl);
@@ -92,5 +133,5 @@ export function analyzeMessage(
       }
     } catch { }
   }
-  return { hasTelegram, hasSuspicious, foundUrls: urls };
+  return { hasTelegram, hasSuspicious, hasRealLink, foundUrls: urls.map(u => u.url) };
 }

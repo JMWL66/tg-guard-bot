@@ -17,11 +17,12 @@ import {
   checkRateLimit,
   checkDuplicate,
   checkShortMessageSpam,
+  checkNoiseSpam,
   isUserInCooldown,
   incrementMsgCount,
   getCustomBlacklist
 } from './store.js';
-import { matchesKeywordSet, hasMultiCheckmark, analyzeMessage } from './detector.js';
+import { matchesKeywordSet, hasMultiCheckmark, analyzeMessage, isNoiseMessage } from './detector.js';
 import { punishUser, notifyAdminLog } from './moderation.js';
 import { handleAdminCommands } from './admin.js';
 import { checkCAS } from './cas.js';
@@ -198,10 +199,11 @@ export async function handleMessage(botToken, env, ctx, message) {
   }
 
   // ── 規則 3：連結偵測 ──────────────────────────────────────────
-  const { hasTelegram, hasSuspicious, foundUrls } = analyzeMessage(message, dynWhitelist, mergedLinks, mergedUsers);
+  const { hasTelegram, hasSuspicious, hasRealLink, foundUrls } = analyzeMessage(message, dynWhitelist, mergedLinks, mergedUsers);
 
-  // 新人（時間窗或前 N 條）發連結 → 直接永久封禁
-  if (isNewUser && foundUrls.length > 0) {
+  // 新人（時間窗或前 N 條）發「真實連結/邀請/黑名單」→ 直接永久封禁
+  // 單純 @群友 提及不算（hasRealLink=false 且未命中黑名單），避免誤殺正常社交
+  if (isNewUser && (hasRealLink || hasTelegram || hasSuspicious)) {
     const reason = inCooldown ? 'link_newuser' : 'link_firstmsg';
     log('info', `新人保護期發連結 (${reason})`, { chatId, userId, foundUrls, msgCount });
     await deleteMessage(botToken, chatId, message.message_id);
@@ -238,6 +240,27 @@ export async function handleMessage(botToken, env, ctx, message) {
 
   // ── 規則 4：洗版偵測 ──────────────────────────────────────────
   if (!userId) return;
+
+  // ── 規則 4a：無意義噪音訊息（純數字/字母 drip，每隔一段時間發一條）──
+  // 長窗計數，遇正常訊息即清零；真人偶發短訊不會累積，機器人持續噪音會被抓
+  const noiseCount = await checkNoiseSpam(env, chatId, userId, isNoiseMessage(originalText));
+  const noiseThreshold = isNewUser ? CONFIG.NOISE_MSG_MAX_NEWUSER : CONFIG.NOISE_MSG_MAX;
+  if (noiseCount >= noiseThreshold) {
+    log('info', '無意義噪音訊息洗版', { chatId, userId, noiseCount, originalText: originalText.slice(0, 40) });
+    await deleteMessage(botToken, chatId, message.message_id);
+    const count = await incrementViolations(env, chatId, userId);
+    const actionType = await punishUser(botToken, env, chatId, message.from, 'noise', count);
+    const warnKey = actionType === 'mute_24h' ? 'warn_mute_24h' : actionType === 'mute_7d' ? 'warn_mute_7d' : 'kick_final';
+    ctx.waitUntil(
+      notifyAdminLog(botToken, env, {
+        chatId, userId, username: message.from?.username,
+        foundUrls: ['[noise]'], reason: 'noise', originalText, count, fileUniqueId
+      })
+    );
+    sendTemporaryMessage(botToken, chatId, t(warnKey), ctx);
+    return;
+  }
+
   const [isRateLimited, isDuplicate, isShortSpam] = await Promise.all([
     checkRateLimit(env, chatId, userId),
     checkDuplicate(env, chatId, userId, originalText),

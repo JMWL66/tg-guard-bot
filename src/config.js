@@ -8,6 +8,9 @@ export const CONFIG = {
   SHORT_MSG_MIN_LEN: 2,   // 少於此字元數視為無意義短訊息
   SHORT_MSG_MAX: 3,       // 連續短訊息達此次數踢出
   SHORT_MSG_WINDOW: 60,   // 秒：連續短訊息計數視窗
+  NOISE_MSG_WINDOW: 30 * 60, // 秒：無意義噪音訊息計數視窗（涵蓋慢速 drip 洗版）
+  NOISE_MSG_MAX: 3,       // 視窗內噪音訊息達此數 → 觸發處罰
+  NOISE_MSG_MAX_NEWUSER: 2, // 新人更嚴格（純數字/字母 drip 幾乎必為機器人）
   VIOLATION_TTL: 7 * 24 * 3600, // 違規計數保留時間 (7天)
   CAPTCHA_TIMEOUT: 60,    // 秒：入群驗證超時，未點按鈕即踢出
   FIRST_MSG_LIMIT: 5,    // 前 N 條訊息期間禁止發送連結/轉發

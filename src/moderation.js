@@ -86,6 +86,7 @@ export async function notifyAdminLog(botToken, env, {
     keyword: '關鍵詞黑名單',
     spam: '洗版/重複',
     short: '無意義短訊息',
+    noise: '無意義噪音訊息（純數字/字母）',
     cas: 'CAS 聯邦封禁',
     sender_chat: '頻道身份發言',
     image_bl: '圖片黑名單'
