@@ -199,7 +199,7 @@ export async function handleMessage(botToken, env, ctx, message) {
   }
 
   // ── 規則 3：連結偵測 ──────────────────────────────────────────
-  const { hasTelegram, hasSuspicious, hasRealLink, foundUrls } = analyzeMessage(message, dynWhitelist, mergedLinks, mergedUsers);
+  const { hasTelegram, hasSuspicious, hasExternalLink, hasRealLink, foundUrls } = analyzeMessage(message, dynWhitelist, mergedLinks, mergedUsers);
 
   // 新人（時間窗或前 N 條）發「真實連結/邀請/黑名單」→ 直接永久封禁
   // 單純 @群友 提及不算（hasRealLink=false 且未命中黑名單），避免誤殺正常社交
@@ -234,6 +234,21 @@ export async function handleMessage(botToken, env, ctx, message) {
         })
       );
       sendTemporaryMessage(botToken, chatId, t(warnKey), ctx);
+    }
+    return;
+  }
+
+  // ── 規則 3b：老用戶發「非白名單外鏈」→ 僅刪除，不處罰（管理員可 /allow 放行）──
+  if (hasExternalLink) {
+    log('info', '非白名單外鏈刪除', { chatId, userId, foundUrls });
+    await deleteMessage(botToken, chatId, message.message_id);
+    if (userId) {
+      ctx.waitUntil(
+        notifyAdminLog(botToken, env, {
+          chatId, userId, username: message.from?.username,
+          foundUrls, reason: 'ext_link', originalText, count: 0, fileUniqueId
+        })
+      );
     }
     return;
   }

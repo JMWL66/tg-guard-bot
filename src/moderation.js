@@ -95,6 +95,7 @@ export async function notifyAdminLog(botToken, env, {
     forward: '轉發訊息',
     banned_source: '黑名單轉發源',
     link: '發送連結',
+    ext_link: '非白名單外鏈（僅刪除）',
     link_newuser: '新人發連結（時間窗）',
     link_firstmsg: '新人發連結（前N條）',
     keyword: '關鍵詞黑名單',

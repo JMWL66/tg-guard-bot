@@ -96,6 +96,7 @@ export function analyzeMessage(
   const urls = extractUrls(message);
   let hasTelegram = false;
   let hasSuspicious = false;
+  let hasExternalLink = false; // 含「非白名單外部域名」連結：老用戶據此僅刪除（不處罰）
   // 是否含「真實連結」（非單純 @提及）：新人保護期據此判斷，@群友放行
   const hasRealLink = urls.some(u => !u.isMention);
   const fullWhitelist = [...dynamicWhitelist];
@@ -127,11 +128,11 @@ export function analyzeMessage(
         }
         // 准許普通 @username 或頻道連結
       } else if (domain !== 'telegram.org') {
-        // ── 4. 外部域名檢查 ──
+        // ── 4. 外部域名檢查：非白名單外鏈標記，由呼叫端決定是否刪除 ──
         const isWhitelisted = fullWhitelist.some(allowed => domain === allowed || domain.endsWith(`.${allowed}`));
-        // 預設准許其他鏈接（保留延展空間）
+        if (!isWhitelisted) hasExternalLink = true;
       }
     } catch { }
   }
-  return { hasTelegram, hasSuspicious, hasRealLink, foundUrls: urls.map(u => u.url) };
+  return { hasTelegram, hasSuspicious, hasExternalLink, hasRealLink, foundUrls: urls.map(u => u.url) };
 }
