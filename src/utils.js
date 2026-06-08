@@ -27,9 +27,11 @@ export async function deleteMessage(botToken, chatId, messageId) {
   return callTelegramAPI(botToken, 'deleteMessage', { chat_id: chatId, message_id: messageId });
 }
 
-export function sendTemporaryMessage(botToken, chatId, text, ctx) {
+export function sendTemporaryMessage(botToken, chatId, text, ctx, parseMode = 'Markdown') {
   const promise = (async () => {
-    const result = await callTelegramAPI(botToken, 'sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown' });
+    const body = { chat_id: chatId, text };
+    if (parseMode) body.parse_mode = parseMode;
+    const result = await callTelegramAPI(botToken, 'sendMessage', body);
     if (result.ok) {
       await new Promise(r => setTimeout(r, 5000));
       await deleteMessage(botToken, chatId, result.result.message_id);

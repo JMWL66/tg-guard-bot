@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { callTelegramAPI, deleteMessage, log } from './utils.js';
+import { callTelegramAPI, deleteMessage, log, escapeHtml } from './utils.js';
 
 // 入群驗證 KV TTL：10 分鐘（cron 每分鐘清理，這個是兜底）
 const CAPTCHA_KV_TTL = 600;
@@ -56,7 +56,7 @@ export async function startCaptcha(botToken, env, chatId, user) {
 
   // 發按鈕
   const displayName = user.first_name || user.username || `User${userId}`;
-  const safeName = displayName.replace(/[<>&]/g, '');
+  const safeName = escapeHtml(displayName);
   const text = `👋 欢迎 <b>${safeName}</b>！\n\n请在 <b>${CONFIG.CAPTCHA_TIMEOUT}</b> 秒内点击下方按钮证明你不是机器人，否则将被自动移出群组。`;
   const result = await callTelegramAPI(botToken, 'sendMessage', {
     chat_id: chatId,

@@ -59,16 +59,18 @@ export async function generateViolationCSV(env) {
 
   const header = '\uFEFF日期,用戶號,用戶名,原因,原文內容,累計次數\n';
   const rows = allLogs.map(log => {
-    const date = log.date || '';
-    const uid = log.userId || '';
-    const uname = (log.username || '').replace(/"/g, '""');
-    const reason = log.reason || '';
-    const content = (log.originalText || '').replace(/"/g, '""').replace(/\n/g, ' ');
-    const count = log.count || '';
-    return `"${date}","${uid}","${uname}","${reason}","${content}","${count}"`;
+    return [log.date, log.userId, log.username, log.reason, log.originalText, log.count]
+      .map(csvCell).join(',');
   }).join('\n');
 
   return header + rows;
+}
+
+// CSV 單元格轉義 + 公式注入防護：以 = + - @ 開頭的值前置 ' 防止 Excel 當公式執行
+function csvCell(value) {
+  let s = String(value ?? '').replace(/[\r\n]/g, ' ');
+  if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
 }
 
 export async function sendCSVDoc(botToken, adminId, csvContent, filename) {

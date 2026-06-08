@@ -2,18 +2,11 @@ import { CONFIG } from './config.js';
 
 const I18N = {
   zh: {
-    welcome: "👋 歡迎新成員！此群組開啟保護模式，*前 5 分鐘禁止發送連結*。",
-    forward_kick: "🚫 *禁止轉發訊息*\n此群組不允許轉發外部訊息，已將該成員移出。",
-    link_kick: "🚫 *禁止發送連結*\n已將發送連結的成員移出群組。",
-    spam_kick: "🚫 *洗版/重複訊息偵測*\n已將發送大量重複訊息的成員移出群組。",
-    short_kick: "🚫 *無意義訊息*\n連續發送無意義短訊息，已將該成員移出群組。",
-    keyword_kick: "🚫 *疑似招攬廣告*\n訊息含有違禁關鍵詞，已將該成員移出群組。",
     allow: "✅ 已准許域名: *{domain}*",
     disallow: "❌ 已移除域名: *{domain}*",
     allow_user: "✅ 已准許用戶 UID: *{userId}*",
     disallow_user: "❌ 已移除准許用戶 UID: *{userId}*",
     list_header: "📋 **目前白名單規則：**\n",
-    list_hard: "\n🏢 **(系統內建規則):**\n",
     list_dyn: "\n🌐 **(動態新增域名):**\n",
     list_users: "\n👤 **(特許用戶):**\n",
     reset_admin: "♻️ 已重置 UID 為 {userId} 的管理快取",
@@ -44,12 +37,6 @@ const I18N = {
     kick_final: "🚫 **多次違規處分**\n該用戶已累計 3 次或更多違規，已被永久移出群組。"
   },
   en: {
-    welcome: "👋 Welcome! Group protected. *No links for first 5 mins*.",
-    forward_kick: "🚫 *No Forwarded Messages*\nForwarding is not allowed. Member removed.",
-    link_kick: "🚫 *No Links Allowed*\nMember removed for posting links.",
-    spam_kick: "🚫 *Spam Detected*\nMember removed for flooding or duplicate messages.",
-    short_kick: "🚫 *Meaningless Messages*\nMember removed for repeatedly sending short meaningless messages.",
-    keyword_kick: "🚫 *Suspected Spam*\nMessage contains banned keywords. Member removed.",
     allow: "✅ Allowed: *{domain}*",
     disallow: "❌ Removed: *{domain}*",
     allow_user: "✅ Whitelisted User UID: *{userId}*",

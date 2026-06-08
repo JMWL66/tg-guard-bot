@@ -39,13 +39,17 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
     ctx.waitUntil(deleteMessage(botToken, chatId, message.message_id));
   }
 
-  const sendMessage = (txt) => {
+  // plain=true → 不使用 Markdown，避免回顯任意用戶輸入（關鍵詞/連結含 ` * _ 等）導致發送失敗
+  const sendMessage = (txt, { plain = false } = {}) => {
+    const parseMode = plain ? undefined : 'Markdown';
     if (message.chat.type === 'private') {
-      const p = callTelegramAPI(botToken, 'sendMessage', { chat_id: chatId, text: txt, parse_mode: 'Markdown' });
+      const body = { chat_id: chatId, text: txt };
+      if (parseMode) body.parse_mode = parseMode;
+      const p = callTelegramAPI(botToken, 'sendMessage', body);
       if (ctx && ctx.waitUntil) ctx.waitUntil(p);
       return p;
     } else {
-      return sendTemporaryMessage(botToken, chatId, txt, ctx);
+      return sendTemporaryMessage(botToken, chatId, txt, ctx, parseMode);
     }
   };
 
@@ -184,7 +188,7 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
       sendMessage('⚠️ 用法：`/bladd <link|user|forward|kw> <值>`\nkw 多詞用逗號分隔（AND 組合）');
     } else {
       await addToBlacklist(env, type, value);
-      sendMessage(`✅ 已加入${BL_TYPE_LABEL[type]}黑名單：\`${formatBlEntry(type, value)}\``);
+      sendMessage(`✅ 已加入${BL_TYPE_LABEL[type]}黑名單：${formatBlEntry(type, value)}`, { plain: true });
     }
   } else if (text.startsWith('/blrm ')) {
     const parts = text.slice('/blrm '.length).trim().split(/\s+/);
@@ -195,23 +199,23 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
       sendMessage('⚠️ 用法：`/blrm <link|user|forward|kw> <值>`');
     } else {
       const next = await removeFromBlacklist(env, type, value);
-      sendMessage(`❌ 已移除${BL_TYPE_LABEL[type]}：\`${formatBlEntry(type, value)}\`\n剩餘：${next.length} 條`);
+      sendMessage(`❌ 已移除${BL_TYPE_LABEL[type]}：${formatBlEntry(type, value)}\n剩餘：${next.length} 條`, { plain: true });
     }
   } else if (text.startsWith('/bllist')) {
     const arg = text.slice('/bllist'.length).trim();
     const types = arg && BL_TYPE_LABEL[arg] ? [arg] : Object.keys(BL_TYPE_LABEL);
-    let out = '📋 *自訂黑名單清單：*\n';
+    let out = '📋 自訂黑名單清單：\n';
     for (const type of types) {
       const list = await getCustomBlacklist(env, type);
-      out += `\n*${BL_TYPE_LABEL[type]}* (${list.length})\n`;
+      out += `\n${BL_TYPE_LABEL[type]} (${list.length})\n`;
       if (list.length === 0) {
-        out += '_(空)_\n';
+        out += '(空)\n';
       } else {
-        out += list.slice(0, 30).map(it => `• \`${formatBlEntry(type, it)}\``).join('\n') + '\n';
-        if (list.length > 30) out += `_… 還有 ${list.length - 30} 條_\n`;
+        out += list.slice(0, 30).map(it => `• ${formatBlEntry(type, it)}`).join('\n') + '\n';
+        if (list.length > 30) out += `… 還有 ${list.length - 30} 條\n`;
       }
     }
-    sendMessage(out);
+    sendMessage(out, { plain: true });
   } else if (text === '/help') {
     sendMessage(t('help'));
   }
