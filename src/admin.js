@@ -1,4 +1,4 @@
-import { WHITELISTED_USER_IDS } from './config.js';
+import { WHITELISTED_USER_IDS, WHITELISTED_DOMAINS } from './config.js';
 import { t } from './i18n.js';
 import { callTelegramAPI, deleteMessage, sendTemporaryMessage } from './utils.js';
 import { getDynamicWhitelist, getDynamicUserWhitelist, getCustomBlacklist, addToBlacklist, removeFromBlacklist } from './store.js';
@@ -90,14 +90,13 @@ export async function handleAdminCommands(botToken, env, ctx, message, status) {
   } else if (text === '/listwhitelist') {
     const dyn = await getDynamicWhitelist(env, chatId);
     const dynUsers = await getDynamicUserWhitelist(env, chatId);
-    let out = t('list_header');
-    out += t('list_dyn') + (dyn.length > 0 ? dyn.map(d => `• ${d}`).join('\n') : '(Empty)') + '\n';
-    
-    // 列表化特許用戶
+    const builtin = Array.from(WHITELISTED_DOMAINS);
+    let out = '📋 目前白名單規則：\n';
+    out += `\n🏢 內建常用大站 (${builtin.length})：\n` + builtin.map(d => `• ${d}`).join('\n') + '\n';
+    out += '\n🌐 動態新增域名 (/allow)：\n' + (dyn.length > 0 ? dyn.map(d => `• ${d}`).join('\n') : '(空)') + '\n';
     const hardUsers = Array.from(WHITELISTED_USER_IDS);
-    out += t('list_users') + [...hardUsers, ...dynUsers].map(u => `• ${u}`).join('\n');
-    
-    sendMessage(out);
+    out += '\n👤 特許用戶：\n' + [...hardUsers, ...dynUsers].map(u => `• ${u}`).join('\n');
+    sendMessage(out, { plain: true });
   } else if (text.startsWith('/unban ')) {
     const uid = parseInt(text.split(' ')[1]);
     if (uid) {

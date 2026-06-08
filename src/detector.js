@@ -1,4 +1,4 @@
-import { CONFIG, KEYWORD_SETS, BLACKLISTED_INVITE_LINKS, BLACKLISTED_USERNAMES } from './config.js';
+import { CONFIG, KEYWORD_SETS, BLACKLISTED_INVITE_LINKS, BLACKLISTED_USERNAMES, WHITELISTED_DOMAINS } from './config.js';
 import { normalizeText } from './utils.js';
 
 // 關鍵詞組合偵測：任一組內所有詞同時出現則命中
@@ -99,7 +99,8 @@ export function analyzeMessage(
   let hasExternalLink = false; // 含「非白名單外部域名」連結：老用戶據此僅刪除（不處罰）
   // 是否含「真實連結」（非單純 @提及）：新人保護期據此判斷，@群友放行
   const hasRealLink = urls.some(u => !u.isMention);
-  const fullWhitelist = [...dynamicWhitelist];
+  // 合併：群組動態白名單（/allow）+ 內建常用大站白名單
+  const fullWhitelist = [...dynamicWhitelist, ...WHITELISTED_DOMAINS];
 
   for (const { url } of urls) {
     try {

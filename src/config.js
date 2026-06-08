@@ -41,6 +41,39 @@ export const BLACKLISTED_INVITE_LINKS = new Set([
   'https://t.me/+akoR4HR8AodkNjk9'
 ]);
 
+// ─── 內建域名白名單（常用大站）────────────────────────────────
+// 老用戶發這些域名的連結直接放行；matching 用 endsWith，故主域自動涵蓋子域
+// （如 google.com 涵蓋 docs.google.com）。管理員可用 /allow 追加群組專屬域名。
+export const WHITELISTED_DOMAINS = new Set([
+  // 搜尋 / Google / YouTube
+  'google.com', 'youtube.com', 'youtu.be', 'goo.gl',
+  // 社交媒體
+  'twitter.com', 'x.com', 'facebook.com', 'fb.com', 'instagram.com',
+  'tiktok.com', 'douyin.com', 'reddit.com', 'linkedin.com', 'threads.net',
+  'weibo.com', 'pinterest.com',
+  // 社群 / 內容
+  'discord.com', 'discord.gg', 'medium.com', 'substack.com', 'quora.com',
+  'zhihu.com', 'bilibili.com', 'b23.tv',
+  // 開發 / 參考
+  'github.com', 'gitlab.com', 'stackoverflow.com', 'npmjs.com',
+  'wikipedia.org', 'mozilla.org', 'notion.so', 'figma.com',
+  // 影音 / 圖床
+  'imgur.com', 'vimeo.com', 'twitch.tv', 'spotify.com', 'soundcloud.com',
+  // 科技公司
+  'apple.com', 'microsoft.com', 'amazon.com', 'cloudflare.com',
+  'openai.com', 'anthropic.com', 'dropbox.com',
+  // 新聞
+  'bbc.com', 'cnn.com', 'nytimes.com', 'reuters.com', 'bloomberg.com',
+  // 加密貨幣（本群相關）
+  'binance.com', 'coinbase.com', 'okx.com', 'bybit.com', 'kraken.com',
+  'kucoin.com', 'gate.io', 'huobi.com', 'bitget.com', 'mexc.com',
+  'coingecko.com', 'coinmarketcap.com', 'tradingview.com',
+  'etherscan.io', 'bscscan.com', 'solscan.io', 'dexscreener.com',
+  'dextools.io', 'defillama.com', 'opensea.io', 'uniswap.org',
+  // 中文常用
+  'baidu.com', 'qq.com', 'taobao.com', 'jd.com'
+]);
+
 // 轉發來源黑名單：來自這些群組的轉發將直接永久封禁
 export const BLACKLISTED_FORWARD_SOURCES = new Set([
   '比特币btc合约免费跟单',
