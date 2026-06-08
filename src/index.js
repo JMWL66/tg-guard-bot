@@ -11,7 +11,7 @@
  */
 
 import { log, callTelegramAPI } from './utils.js';
-import { generateViolationCSV, sendCSVDoc } from './report.js';
+import { generateViolationCSV } from './report.js';
 import { handleMessage } from './message.js';
 import { recordUserJoinTime } from './store.js';
 import { startCaptcha, handleCaptchaCallback, sweepExpiredCaptchas, markVerified } from './captcha.js';
@@ -145,20 +145,6 @@ export default {
         if (kicked > 0) log('info', 'Captcha sweep done', { kicked });
       } catch (e) {
         log('error', 'Captcha sweep failed', { error: e.message });
-      }
-      return;
-    }
-
-    // 每日 00:00 UTC：發送違規報表
-    if (event.cron === '0 0 * * *') {
-      const adminId = env.ADMIN_ID;
-      if (!adminId) return;
-      try {
-        const csv = await generateViolationCSV(env);
-        await sendCSVDoc(botToken, adminId, csv, `daily_all_history_${new Date().toISOString().split('T')[0]}.csv`);
-        log('info', '每日全量報表已發送');
-      } catch (e) {
-        log('error', '每日報表發送失敗', { error: e.message });
       }
     }
   }
