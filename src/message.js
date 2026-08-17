@@ -22,7 +22,7 @@ import {
   incrementMsgCount,
   getCustomBlacklist
 } from './store.js';
-import { matchesKeywordSet, hasMultiCheckmark, analyzeMessage, isNoiseMessage } from './detector.js';
+import { matchesKeywordSet, hasMultiCheckmark, hasProfitBragPattern, analyzeMessage, isNoiseMessage } from './detector.js';
 import { punishUser, notifyAdminLog } from './moderation.js';
 import { handleAdminCommands } from './admin.js';
 import { checkCAS } from './cas.js';
@@ -180,7 +180,7 @@ export async function handleMessage(botToken, env, ctx, message) {
   }
 
   // ── 規則 2：關鍵詞組合偵測 / 多✅emoji ───────────────────────
-  if (matchesKeywordSet(originalText, mergedKws) || hasMultiCheckmark(originalText)) {
+  if (matchesKeywordSet(originalText, mergedKws) || hasMultiCheckmark(originalText) || hasProfitBragPattern(originalText)) {
     log('info', 'Keyword 違規', { chatId, userId, originalText: originalText.slice(0, 80) });
     await deleteMessage(botToken, chatId, message.message_id);
     if (userId) {

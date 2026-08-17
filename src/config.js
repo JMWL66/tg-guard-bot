@@ -38,7 +38,8 @@ export const BLACKLISTED_INVITE_LINKS = new Set([
   'https://t.me/+_20NHyKkibczZTU5',
   'https://t.me/+BCKNBdfXxAViM2Fh',
   'https://t.me/+TUypbviU3i05ZTkx',
-  'https://t.me/+akoR4HR8AodkNjk9'
+  'https://t.me/+akoR4HR8AodkNjk9',
+  'https://t.me/+nU3b4Wmh-EE2N2E5'
 ]);
 
 // ─── 內建域名白名單（常用大站）────────────────────────────────
@@ -177,4 +178,18 @@ export const KEYWORD_SETS = [
   ['Geminivip1'],
   ['比特幣山寨合約策略'],
   ['比特币山寨合约策略'],
+  // ── 汇盘相关新广告 ──
+  ['汇盘', '俱乐部'],
+  ['匯盤', '俱樂部'],
+  ['汇盘', '社区'],
+  ['匯盤', '社區'],
+  ['汇盘', '行情'],
+  ['匯盤', '行情'],
+  ['汇盘', '免费'],
+  ['匯盤', '免費'],
+  // ── 主頁/簡介引流 + 曬單暴富話術（如「我主頁的社群」「3天從100u翻到58000u」）──
+  ['主页', '社群'],
+  ['主頁', '社群'],
+  ['主页', '社区'],
+  ['主頁', '社區'],
 ];

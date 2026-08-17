@@ -24,6 +24,14 @@ export function hasMultiCheckmark(text) {
   return (text.match(/✅/g) || []).length > 1;
 }
 
+// 資金倍增曬單偵測：如「100u翻,仓到58000u」「500刀做到2万」等誇大暴富話術
+// 金額數字千變萬化無法窮舉關鍵詞，改用「金額+單位 ... 動詞 ... 金額+單位」結構比對
+const PROFIT_BRAG_RE = /\d+\s*(?:u|usdt|刀|米)\D{0,12}(?:翻|做到|冲到|沖到|干到|幹到|拉到|回血到)\D{0,12}\d+\s*(?:u|usdt|刀|米|万|萬)?/i;
+export function hasProfitBragPattern(text) {
+  if (!text) return false;
+  return PROFIT_BRAG_RE.test(normalizeText(text));
+}
+
 // 無意義噪音訊息偵測：純數字 / 純字母 / 單字重複 / 數字字母亂碼
 // （機器人常見手法：每隔一段時間發一條 "879"、"9527" 之類的填充訊息）
 // 為降低誤殺，僅針對「不含中日韓文字、長度短」的訊息；
