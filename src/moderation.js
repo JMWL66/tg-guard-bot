@@ -1,5 +1,5 @@
 import { callTelegramAPI, escapeHtml, log } from './utils.js';
-import { CONFIG } from './config.js';
+import { CONFIG, REASON_LABELS } from './config.js';
 
 // ─── 階梯式處罰（1: 24h禁媒體/連結, 2: 7d全禁, 3: 永久封鎖）──────
 export async function punishUser(botToken, env, chatId, user, reason, count) {
@@ -91,22 +91,6 @@ export async function notifyAdminLog(botToken, env, {
   }
 
   // ─── 發送通知（HTML）───
-  const reasonMap = {
-    forward: '轉發訊息',
-    banned_source: '黑名單轉發源',
-    link: '發送連結',
-    ext_link: '非白名單外鏈（僅刪除）',
-    link_newuser: '新人發連結（時間窗）',
-    link_firstmsg: '新人發連結（前N條）',
-    keyword: '關鍵詞黑名單',
-    spam: '洗版/重複',
-    short: '無意義短訊息',
-    noise: '無意義噪音訊息（純數字/字母）',
-    cas: 'CAS 聯邦封禁',
-    sender_chat: '頻道身份發言',
-    image_bl: '圖片黑名單'
-  };
-
   const preview = originalText
     ? `\n📝 原文: <code>${escapeHtml(originalText.slice(0, 120))}${originalText.length > 120 ? '…' : ''}</code>`
     : '';
@@ -122,7 +106,7 @@ export async function notifyAdminLog(botToken, env, {
   const txt = `🚨 <b>違規活動記錄</b>\n\n` +
     `📍 群組: <code>${chatId}</code>\n` +
     `👤 用戶: <code>${userId}</code> (${escapeHtml(username || '無名氏')})\n` +
-    `⚡ 原因: ${escapeHtml(reasonMap[reason] || reason)}` +
+    `⚡ 原因: ${escapeHtml(REASON_LABELS[reason] || reason)}` +
     preview +
     urlLine +
     imgLine +

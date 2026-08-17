@@ -21,6 +21,23 @@ export const CONFIG = {
   REGEX_URL: /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+|@\w{5,})/gi
 };
 
+// 違規原因代碼 → 中文標籤（管理員通知 + 每日報表共用）
+export const REASON_LABELS = {
+  forward: '轉發訊息',
+  banned_source: '黑名單轉發源',
+  link: '發送連結',
+  ext_link: '非白名單外鏈（僅刪除）',
+  link_newuser: '新人發連結（時間窗）',
+  link_firstmsg: '新人發連結（前N條）',
+  keyword: '關鍵詞黑名單',
+  spam: '洗版/重複',
+  short: '無意義短訊息',
+  noise: '無意義噪音訊息（純數字/字母）',
+  cas: 'CAS 聯邦封禁',
+  sender_chat: '頻道身份發言',
+  image_bl: '圖片黑名單'
+};
+
 // Telegram 系統帳號 / 匿名管理員 ID，一律視為管理員
 export const SYSTEM_BOT_IDS = new Set([777000, 1087968824, 136817688]);
 

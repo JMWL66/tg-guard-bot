@@ -1,3 +1,36 @@
+import { REASON_LABELS } from './config.js';
+import { escapeHtml } from './utils.js';
+
+// 產生指定日期（YYYY-MM-DD，UTC）的文字違規摘要；當日 0 筆違規回傳 null（呼叫端據此不推送）
+export async function generateDailyTextReport(env, dateStr) {
+  const counts = {};
+  const users = new Set();
+  let total = 0;
+
+  let cursor;
+  do {
+    const list = await env.TG_GUARD_KV.list({ prefix: 'vlog:', cursor });
+    for (const key of list.keys) {
+      const m = key.metadata;
+      if (!m || m.date !== dateStr) continue;
+      total++;
+      counts[m.reason] = (counts[m.reason] || 0) + 1;
+      if (m.userId) users.add(m.userId);
+    }
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+
+  if (total === 0) return null;
+
+  const lines = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, n]) => `• ${escapeHtml(REASON_LABELS[reason] || reason)}: ${n}`);
+
+  return `📊 <b>每日違規報表</b> ${dateStr}\n\n` +
+    `共處理 ${total} 次違規，涉及 ${users.size} 位用戶\n\n` +
+    lines.join('\n');
+}
+
 export async function generateViolationCSV(env) {
   let allLogs = [];
   
